@@ -1,0 +1,165 @@
+@import "tailwindcss";
+
+html {
+  background-color: #020617;
+  color: #f8fafc;
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #020617;
+  color: #f8fafc;
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#root {
+  min-height: 100%;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background-color: #020617;
+}
+
+/* Custom sleek scrollbar for desktop mouse users */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #020617;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 5px;
+  border: 2px solid #020617;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+
+@keyframes bounceSubtle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes scaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* On-Fire Streak Keyframes */
+@keyframes flameFlicker {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+    filter: drop-shadow(0 0 6px rgba(249, 115, 22, 0.85)) drop-shadow(0 0 14px rgba(239, 68, 68, 0.65));
+  }
+  25% {
+    transform: scale(1.1) rotate(-2deg);
+    filter: drop-shadow(0 0 10px rgba(249, 115, 22, 0.95)) drop-shadow(0 0 18px rgba(245, 158, 11, 0.75));
+  }
+  50% {
+    transform: scale(0.96) rotate(1.5deg);
+    filter: drop-shadow(0 0 7px rgba(234, 88, 12, 0.85)) drop-shadow(0 0 12px rgba(220, 38, 38, 0.55));
+  }
+  75% {
+    transform: scale(1.08) rotate(-1deg);
+    filter: drop-shadow(0 0 12px rgba(251, 146, 60, 0.95)) drop-shadow(0 0 22px rgba(239, 68, 68, 0.7));
+  }
+}
+
+@keyframes fireGlowPulse {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(249, 115, 22, 0.45), inset 0 0 8px rgba(239, 68, 68, 0.25);
+    border-color: rgba(249, 115, 22, 0.75);
+  }
+  50% {
+    box-shadow: 0 0 26px rgba(249, 115, 22, 0.85), 0 0 40px rgba(239, 68, 68, 0.45), inset 0 0 14px rgba(245, 158, 11, 0.4);
+    border-color: rgba(251, 146, 60, 1);
+  }
+}
+
+@keyframes fireTextShimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes emberFloat {
+  0% {
+    transform: translateY(0) scale(1) translateX(0);
+    opacity: 0.9;
+  }
+  50% {
+    transform: translateY(-16px) scale(0.85) translateX(3px);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateY(-32px) scale(0.2) translateX(-4px);
+    opacity: 0;
+  }
+}
+
+.animate-bounce-subtle {
+  animation: bounceSubtle 2.5s ease-in-out infinite;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-scaleUp {
+  animation: scaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-flame {
+  animation: flameFlicker 1.8s ease-in-out infinite;
+}
+
+.animate-fire-glow {
+  animation: fireGlowPulse 2s ease-in-out infinite;
+}
+
+.animate-fire-text {
+  background-size: 200% auto;
+  animation: fireTextShimmer 2.5s linear infinite;
+}
+
+.animate-ember {
+  animation: emberFloat 1.6s ease-out infinite;
+}
+

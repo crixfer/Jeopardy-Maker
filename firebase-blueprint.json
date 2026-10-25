@@ -1,0 +1,161 @@
+{
+  "entities": {
+    "Game": {
+      "title": "Game",
+      "description": "A Jeopardy game board structure containing categories and questions",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Game title",
+          "maxLength": 100
+        },
+        "description": {
+          "type": "string",
+          "description": "Game description",
+          "maxLength": 500
+        },
+        "creatorId": {
+          "type": "string",
+          "description": "UID of creator or public anonymous instructor",
+          "maxLength": 128
+        },
+        "isPublic": {
+          "type": "boolean",
+          "description": "Whether game is publicly available in community library"
+        },
+        "categories": {
+          "type": "array",
+          "description": "List of categories with questions"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp ISO string"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp ISO string"
+        }
+      },
+      "required": ["title", "categories"]
+    },
+    "GameSession": {
+      "title": "GameSession",
+      "description": "A live interactive Jeopardy game session with real-time state, buzzer and timer",
+      "type": "object",
+      "properties": {
+        "pin": {
+          "type": "string",
+          "description": "6-digit room PIN code",
+          "maxLength": 10
+        },
+        "gameId": {
+          "type": "string",
+          "description": "ID of the source game template",
+          "maxLength": 128
+        },
+        "hostId": {
+          "type": "string",
+          "description": "Host device or user ID",
+          "maxLength": 128
+        },
+        "status": {
+          "type": "string",
+          "description": "Current phase of session: lobby, active, question_open, question_buzzed, question_revealed, finished",
+          "maxLength": 30
+        },
+        "gameTitle": {
+          "type": "string",
+          "description": "Title of the active game",
+          "maxLength": 100
+        },
+        "categories": {
+          "type": "array",
+          "description": "Categories snapshot for this session"
+        },
+        "activeQuestion": {
+          "type": "object",
+          "description": "Currently opened question details and round timer"
+        },
+        "teams": {
+          "type": "object",
+          "description": "Dictionary of joined teams with scores, avatars, and streak"
+        },
+        "buzzedTeam": {
+          "type": "object",
+          "description": "Details of team that buzzed in first"
+        },
+        "answeredQuestionIds": {
+          "type": "array",
+          "description": "List of completed question keys"
+        },
+        "lastAction": {
+          "type": "string",
+          "description": "Latest action tag for real-time sound trigger (e.g. correct, wrong, buzz, timeup)",
+          "maxLength": 50
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last updated timestamp"
+        }
+      },
+      "required": ["pin", "status", "teams"]
+    },
+    "LeaderboardEntry": {
+      "title": "LeaderboardEntry",
+      "description": "Persistent record of team performance across multiple game sessions",
+      "type": "object",
+      "properties": {
+        "teamName": {
+          "type": "string",
+          "description": "Unique normalized team name",
+          "maxLength": 60
+        },
+        "avatarId": {
+          "type": "string",
+          "description": "Avatar style key",
+          "maxLength": 40
+        },
+        "totalScore": {
+          "type": "number",
+          "description": "Accumulated points across sessions"
+        },
+        "gamesPlayed": {
+          "type": "number",
+          "description": "Total sessions played"
+        },
+        "gamesWon": {
+          "type": "number",
+          "description": "Total first-place victories"
+        },
+        "highestScore": {
+          "type": "number",
+          "description": "Highest score achieved in a single game"
+        },
+        "lastPlayedAt": {
+          "type": "string",
+          "description": "Timestamp of most recent game"
+        }
+      },
+      "required": ["teamName", "totalScore", "gamesPlayed"]
+    }
+  },
+  "firestore": {
+    "/games/{gameId}": {
+      "schema": "Game",
+      "description": "Custom Jeopardy game boards created by instructors"
+    },
+    "/game_sessions/{sessionId}": {
+      "schema": "GameSession",
+      "description": "Live real-time multiplayer jeopardy game sessions"
+    },
+    "/leaderboards/{leaderboardId}": {
+      "schema": "LeaderboardEntry",
+      "description": "Persistent leaderboard tracking teams across multiple game sessions"
+    }
+  }
+}

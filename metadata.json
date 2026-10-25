@@ -1,0 +1,6 @@
+{
+  "name": "EduJeopardy - Live Classroom Trivia & Game Show",
+  "description": "Open-source, free classroom Jeopardy and trivia battle platform with real-time multiplayer, drag-and-drop game builder, team avatars, timer, audio signals, and persistent leaderboards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
