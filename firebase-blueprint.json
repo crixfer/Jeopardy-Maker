@@ -28,6 +28,10 @@
           "type": "array",
           "description": "List of categories with questions"
         },
+        "tieBreakerQuestions": {
+          "type": "array",
+          "description": "Up to 10 custom contextual sudden death tie breaker questions for this board"
+        },
         "createdAt": {
           "type": "string",
           "description": "Creation timestamp ISO string"
@@ -88,6 +92,10 @@
         "answeredQuestionIds": {
           "type": "array",
           "description": "List of completed question keys"
+        },
+        "tieBreakerQuestions": {
+          "type": "array",
+          "description": "Snapshot of up to 10 contextual tie breaker questions"
         },
         "lastAction": {
           "type": "string",

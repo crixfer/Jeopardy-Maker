@@ -313,10 +313,15 @@ export const BoardView: React.FC<BoardViewProps> = ({
             <button
               onClick={onStartTieBreaker}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-600/30 to-yellow-600/30 hover:from-amber-600/50 hover:to-yellow-600/50 border border-amber-500/50 text-amber-300 font-bold text-xs sm:text-sm shadow-sm transition-all hover:scale-105 active:scale-95"
-              title="Start an optional sudden-death playoff to break ties"
+              title={`Start sudden-death playoff (${game.tieBreakerQuestions?.length || 0} contextual questions for ${game.title})`}
             >
               <Zap className="w-3.5 h-3.5 fill-current" />
               <span>Tie Breaker</span>
+              {Boolean(game.tieBreakerQuestions?.length) && (
+                <span className="px-1.5 py-0.5 rounded-full bg-amber-500/30 text-[10px] text-amber-200 font-black border border-amber-400/40 leading-none">
+                  {game.tieBreakerQuestions?.length}
+                </span>
+              )}
             </button>
           )}
 

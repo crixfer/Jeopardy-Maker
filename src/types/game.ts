@@ -25,6 +25,7 @@ export interface Game {
   creatorId?: string;
   isPublic?: boolean;
   categories: Category[];
+  tieBreakerQuestions?: TieBreakerQuestion[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -80,6 +81,7 @@ export interface GameSession {
   buzzerQueue?: BuzzerQueueItem[];
   attemptedTeamIds?: string[]; // Teams that have already attempted this question
   answeredQuestionIds: string[];
+  tieBreakerQuestions?: TieBreakerQuestion[];
   lastAction?: string; // For sound triggers in clients: 'buzz', 'correct', 'wrong', 'timeup'
   lastActionTimestamp?: number;
   defaultTimerSeconds?: number;

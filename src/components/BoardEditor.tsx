@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Download, Upload, Sparkles, Check, Play, Edit3, HelpCircle, Save, FileSpreadsheet } from 'lucide-react';
-import { Game, Category, Question } from '../types/game';
+import { Plus, Trash2, ArrowLeft, ArrowRight, ArrowUp, ArrowDown, Download, Upload, Sparkles, Check, Play, Edit3, HelpCircle, Save, FileSpreadsheet, Zap, Copy, Lightbulb } from 'lucide-react';
+import { Game, Category, Question, TieBreakerQuestion } from '../types/game';
 import { DEFAULT_GAMES } from '../utils/defaultGames';
 import { CsvImporterModal } from './CsvImporterModal';
+
+export const MAX_TIE_BREAKER_QUESTIONS = 10;
 
 interface BoardEditorProps {
   initialGame?: Game | null;
@@ -22,6 +24,7 @@ export const BoardEditor: React.FC<BoardEditorProps> = ({
       description: 'Custom trivia game created for our class.',
       isPublic: true,
       categories: JSON.parse(JSON.stringify(DEFAULT_GAMES[0].categories)),
+      tieBreakerQuestions: JSON.parse(JSON.stringify(DEFAULT_GAMES[0].tieBreakerQuestions || [])),
     }
   );
 
@@ -33,8 +36,82 @@ export const BoardEditor: React.FC<BoardEditorProps> = ({
   const [aiPromptTopic, setAiPromptTopic] = useState<string>('');
   const [showAiModal, setShowAiModal] = useState<boolean>(false);
   const [showCsvModal, setShowCsvModal] = useState<boolean>(false);
+  const [showCategoryPickerForTb, setShowCategoryPickerForTb] = useState<boolean>(false);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
+
+  // Tie Breaker Management (Max 10 questions)
+  const tieBreakerCount = game.tieBreakerQuestions?.length || 0;
+
+  const handleAddTieBreaker = () => {
+    if (tieBreakerCount >= MAX_TIE_BREAKER_QUESTIONS) return;
+    const currentTbs = game.tieBreakerQuestions || [];
+    const newTb: TieBreakerQuestion = {
+      id: `tb-${Date.now()}-${currentTbs.length + 1}`,
+      question: '',
+      answer: '',
+      hint: '',
+    };
+    setGame({
+      ...game,
+      tieBreakerQuestions: [...currentTbs, newTb],
+    });
+  };
+
+  const handleUpdateTieBreaker = (index: number, fields: Partial<TieBreakerQuestion>) => {
+    const currentTbs = [...(game.tieBreakerQuestions || [])];
+    if (!currentTbs[index]) return;
+    currentTbs[index] = { ...currentTbs[index], ...fields };
+    setGame({ ...game, tieBreakerQuestions: currentTbs });
+  };
+
+  const handleDeleteTieBreaker = (index: number) => {
+    const currentTbs = (game.tieBreakerQuestions || []).filter((_, i) => i !== index);
+    setGame({ ...game, tieBreakerQuestions: currentTbs });
+  };
+
+  const handleMoveTieBreaker = (index: number, direction: 'up' | 'down') => {
+    const currentTbs = [...(game.tieBreakerQuestions || [])];
+    const target = direction === 'up' ? index - 1 : index + 1;
+    if (target < 0 || target >= currentTbs.length) return;
+    const temp = currentTbs[index];
+    currentTbs[index] = currentTbs[target];
+    currentTbs[target] = temp;
+    setGame({ ...game, tieBreakerQuestions: currentTbs });
+  };
+
+  const handleQuickAddFromCategory = (catIndex: number, qIndex: number) => {
+    if (tieBreakerCount >= MAX_TIE_BREAKER_QUESTIONS) return;
+    const sourceCat = game.categories[catIndex];
+    const sourceQ = sourceCat?.questions?.[qIndex];
+    if (!sourceQ) return;
+    const newTb: TieBreakerQuestion = {
+      id: `tb-cat-${Date.now()}`,
+      question: sourceQ.question,
+      answer: sourceQ.answer,
+      hint: sourceQ.hint || `Context: ${sourceCat.title}`,
+    };
+    setGame({
+      ...game,
+      tieBreakerQuestions: [...(game.tieBreakerQuestions || []), newTb],
+    });
+    setShowCategoryPickerForTb(false);
+  };
+
+  const handleSuggestThematicTieBreaker = () => {
+    if (tieBreakerCount >= MAX_TIE_BREAKER_QUESTIONS) return;
+    const firstCat = game.categories[0]?.title || 'Key Knowledge';
+    const sampleThematicQ: TieBreakerQuestion = {
+      id: `tb-thematic-${Date.now()}`,
+      question: `Sudden Death Challenge (${game.title}): What foundational concept or key discovery is central to ${firstCat}?`,
+      answer: `Core Principle of ${firstCat}`,
+      hint: `Contextual playoff question for ${game.title}`,
+    };
+    setGame({
+      ...game,
+      tieBreakerQuestions: [...(game.tieBreakerQuestions || []), sampleThematicQ],
+    });
+  };
 
   // Reorder Category Left
   const moveCategoryLeft = (index: number) => {
@@ -152,6 +229,9 @@ export const BoardEditor: React.FC<BoardEditorProps> = ({
       try {
         const parsed = JSON.parse(event.target?.result as string);
         if (parsed.title && Array.isArray(parsed.categories)) {
+          if (Array.isArray(parsed.tieBreakerQuestions)) {
+            parsed.tieBreakerQuestions = parsed.tieBreakerQuestions.slice(0, MAX_TIE_BREAKER_QUESTIONS);
+          }
           setGame(parsed);
         } else {
           alert('Invalid Jeopardy game JSON format.');
@@ -241,6 +321,26 @@ export const BoardEditor: React.FC<BoardEditorProps> = ({
               { id: `q-24`, points: 400, question: `What paradox or dilemma frequently arises in advanced ${topic}?`, answer: `The Central Paradox` },
               { id: `q-25`, points: 500, question: `Name the crowning achievement that symbolizes complete mastery of ${topic}.`, answer: `Universal Grandmastery` },
             ],
+          },
+        ],
+        tieBreakerQuestions: [
+          {
+            id: `tb-gen-1`,
+            question: `Sudden Death Challenge (${topic}): What fundamental principle or central law defines the entire field of ${topic}?`,
+            answer: `The Core Axiom of ${topic}`,
+            hint: `Foundational law in ${topic}.`,
+          },
+          {
+            id: `tb-gen-2`,
+            question: `Sudden Death Challenge (${topic}): Which breakthrough innovation or discovery revolutionized modern ${topic}?`,
+            answer: `The Primary Innovation`,
+            hint: `Milestone achievement in ${topic}.`,
+          },
+          {
+            id: `tb-gen-3`,
+            question: `Sudden Death Challenge (${topic}): What is the most famous question or paradox still debated in ${topic}?`,
+            answer: `The Central Paradox of ${topic}`,
+            hint: `Widely discussed topic dilemma.`,
           },
         ],
       };
@@ -516,6 +616,198 @@ export const BoardEditor: React.FC<BoardEditorProps> = ({
         </div>
       </div>
 
+      {/* Sudden Death Tie Breaker Questions Section (Max 10) */}
+      <div className="bg-slate-950/80 border-2 border-amber-500/40 rounded-3xl p-4 sm:p-6 shadow-2xl space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-500/30 shadow-md">
+              <Zap className="w-5 h-5 fill-current" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base sm:text-lg font-black text-white">
+                  Sudden Death Tie Breakers
+                </h2>
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-black border ${
+                  tieBreakerCount >= MAX_TIE_BREAKER_QUESTIONS
+                    ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                    : tieBreakerCount > 0
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                    : 'bg-slate-800 text-slate-400 border-slate-700'
+                }`}>
+                  {tieBreakerCount} / {MAX_TIE_BREAKER_QUESTIONS} Max Questions
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 font-medium max-w-2xl mt-0.5">
+                Add up to 10 custom tie breaker questions specifically for this board. When teams tie for 1st place, random tie breakers are drawn from this contextual pool to keep playoffs relevant to your topic.
+              </p>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Clone from Category Tile */}
+            <button
+              type="button"
+              onClick={() => setShowCategoryPickerForTb(true)}
+              disabled={tieBreakerCount >= MAX_TIE_BREAKER_QUESTIONS}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Pick an existing question from your board to clone into the tie breaker pool"
+            >
+              <Copy className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Clone from Categories</span>
+            </button>
+
+            {/* Quick Suggest Thematic */}
+            <button
+              type="button"
+              onClick={handleSuggestThematicTieBreaker}
+              disabled={tieBreakerCount >= MAX_TIE_BREAKER_QUESTIONS}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              title="Add a contextual sudden-death challenge based on this board's title"
+            >
+              <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
+              <span>Suggest Context Question</span>
+            </button>
+
+            {/* Add Tie Breaker Question Button */}
+            <button
+              type="button"
+              onClick={handleAddTieBreaker}
+              disabled={tieBreakerCount >= MAX_TIE_BREAKER_QUESTIONS}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Tie Breaker</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Empty state or questions list */}
+        {tieBreakerCount === 0 ? (
+          <div className="text-center py-8 px-4 bg-slate-900/40 rounded-2xl border border-dashed border-slate-800 flex flex-col items-center justify-center space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+              <Zap className="w-6 h-6" />
+            </div>
+            <div>
+              <h4 className="text-sm font-black text-white">No Custom Tie Breaker Questions Yet</h4>
+              <p className="text-xs text-slate-400 max-w-md mt-1">
+                Without custom questions, general fallback trivia will be used during playoffs. Add up to 10 context-specific questions for <strong>"{game.title}"</strong> so tie breakers stay focused on your curriculum!
+              </p>
+            </div>
+            <div className="flex gap-2 pt-1 flex-wrap justify-center">
+              <button
+                type="button"
+                onClick={handleAddTieBreaker}
+                className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs shadow transition-all hover:scale-105 active:scale-95"
+              >
+                + Add First Tie Breaker Question
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCategoryPickerForTb(true)}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs border border-slate-700 transition-colors"
+              >
+                Clone from Board Categories
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            {(game.tieBreakerQuestions || []).map((tbQ, tbIdx) => (
+              <div
+                key={tbQ.id}
+                className="bg-slate-900/90 border border-slate-800 hover:border-amber-500/50 rounded-2xl p-4 flex flex-col justify-between space-y-3 transition-colors shadow-md group"
+              >
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[11px] font-mono font-black flex items-center justify-center">
+                      #{tbIdx + 1}
+                    </span>
+                    <span className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                      Sudden Death Card
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleMoveTieBreaker(tbIdx, 'up')}
+                      disabled={tbIdx === 0}
+                      title="Move Question Up"
+                      className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-white disabled:opacity-20"
+                    >
+                      <ArrowUp className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMoveTieBreaker(tbIdx, 'down')}
+                      disabled={tbIdx === tieBreakerCount - 1}
+                      title="Move Question Down"
+                      className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-white disabled:opacity-20"
+                    >
+                      <ArrowDown className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteTieBreaker(tbIdx)}
+                      title="Delete Question"
+                      className="p-1 rounded hover:bg-rose-950/40 text-slate-500 hover:text-rose-400 transition-colors ml-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Form fields inline */}
+                <div className="space-y-2.5">
+                  <div>
+                    <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">
+                      Question Prompt
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={tbQ.question}
+                      onChange={(e) => handleUpdateTieBreaker(tbIdx, { question: e.target.value })}
+                      placeholder="e.g. In chemistry, what element has the symbol Au?"
+                      className="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-400 font-medium"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-extrabold uppercase tracking-wider text-emerald-400 mb-1">
+                        Correct Answer
+                      </label>
+                      <input
+                        type="text"
+                        value={tbQ.answer}
+                        onChange={(e) => handleUpdateTieBreaker(tbIdx, { answer: e.target.value })}
+                        placeholder="e.g. Gold"
+                        className="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500 font-bold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">
+                        Teacher Hint (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={tbQ.hint || ''}
+                        onChange={(e) => handleUpdateTieBreaker(tbIdx, { hint: e.target.value })}
+                        placeholder="e.g. From Latin 'Aurum'"
+                        className="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Question Details Editor Drawer / Modal */}
       {activeEditQuestion && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
@@ -685,6 +977,80 @@ export const BoardEditor: React.FC<BoardEditorProps> = ({
                 className="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-sm"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Category Question Picker for Tie Breakers Modal */}
+      {showCategoryPickerForTb && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-slate-900 border-2 border-indigo-600 rounded-3xl p-5 sm:p-7 max-w-2xl w-full shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <Copy className="w-5 h-5 text-indigo-400" />
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-white">
+                    Clone Tile into Tie Breaker
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Click any tile below to copy its question & answer into this board's tie breaker pool ({tieBreakerCount}/{MAX_TIE_BREAKER_QUESTIONS}).
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCategoryPickerForTb(false)}
+                className="text-slate-400 hover:text-white font-bold p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 space-y-4 pr-1">
+              {game.categories.map((cat, cIdx) => (
+                <div key={cat.id} className="bg-slate-950/60 rounded-2xl border border-slate-800 p-3 space-y-2">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-amber-400">
+                    {cat.title}
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {cat.questions.map((q, qIdx) => (
+                      <button
+                        key={q.id}
+                        type="button"
+                        onClick={() => handleQuickAddFromCategory(cIdx, qIdx)}
+                        disabled={tieBreakerCount >= MAX_TIE_BREAKER_QUESTIONS}
+                        className="text-left p-2.5 rounded-xl bg-slate-900 hover:bg-indigo-950/80 border border-slate-800 hover:border-indigo-500/60 transition-all group flex flex-col justify-between"
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-mono font-bold text-amber-300">
+                            {q.points} PTS
+                          </span>
+                          <span className="text-[10px] font-bold text-indigo-400 group-hover:text-indigo-300 flex items-center gap-1">
+                            + Clone
+                          </span>
+                        </div>
+                        <p className="text-xs font-bold text-white line-clamp-2">
+                          "{q.question}"
+                        </p>
+                        <span className="text-[11px] text-emerald-400 font-semibold line-clamp-1 mt-1">
+                          Ans: {q.answer}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="pt-2 border-t border-slate-800 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowCategoryPickerForTb(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs"
+              >
+                Close
               </button>
             </div>
           </div>

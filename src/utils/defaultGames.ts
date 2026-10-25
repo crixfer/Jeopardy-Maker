@@ -219,6 +219,44 @@ export const DEFAULT_GAMES: Game[] = [
         ],
       },
     ],
+    tieBreakerQuestions: [
+      {
+        id: 'tb-stem-1',
+        question: 'Which planet in our solar system has the most confirmed natural moons (over 140)?',
+        answer: 'Saturn',
+        hint: 'Famous for its prominent rings.',
+      },
+      {
+        id: 'tb-stem-2',
+        question: 'How many confirmed chemical elements are currently on the periodic table?',
+        answer: '118 Elements',
+        hint: 'Atomic numbers 1 to 118, ending with Oganesson.',
+      },
+      {
+        id: 'tb-stem-3',
+        question: 'What is the only mammal capable of true, sustained flight?',
+        answer: 'The Bat',
+        hint: 'Belongs to the order Chiroptera.',
+      },
+      {
+        id: 'tb-stem-4',
+        question: 'How many hearts does an octopus possess to pump blue blood?',
+        answer: '3 Hearts',
+        hint: 'Two pump blood to gills, one to the body.',
+      },
+      {
+        id: 'tb-stem-5',
+        question: 'What subatomic particle carries a negative electric charge?',
+        answer: 'Electron',
+        hint: 'Orbits around the atomic nucleus.',
+      },
+      {
+        id: 'tb-stem-6',
+        question: 'What is the hardest naturally occurring mineral on Earth?',
+        answer: 'Diamond',
+        hint: 'Scores 10 on the Mohs hardness scale.',
+      },
+    ],
   },
   {
     id: 'world-geography-history',
@@ -438,6 +476,44 @@ export const DEFAULT_GAMES: Game[] = [
         ],
       },
     ],
+    tieBreakerQuestions: [
+      {
+        id: 'tb-geo-1',
+        question: 'What ancient wonder was located in Alexandria, Egypt and guided sailors across the Mediterranean?',
+        answer: 'The Lighthouse of Alexandria (Pharos)',
+        hint: 'One of the Seven Wonders of the Ancient World.',
+      },
+      {
+        id: 'tb-geo-2',
+        question: 'What is the smallest independent country in the world by both area and population?',
+        answer: 'Vatican City',
+        hint: 'Enclaved completely within Rome, Italy.',
+      },
+      {
+        id: 'tb-geo-3',
+        question: 'Which river flows through the greatest number of countries in the world (10 countries)?',
+        answer: 'The Danube River',
+        hint: 'Flows from Germany to the Black Sea.',
+      },
+      {
+        id: 'tb-geo-4',
+        question: 'In what modern-day country would you find the ancient Inca ruins of Machu Picchu?',
+        answer: 'Peru',
+        hint: 'High in the Andes Mountains above the Urubamba River.',
+      },
+      {
+        id: 'tb-geo-5',
+        question: 'What strait separates the continent of Africa from Europe?',
+        answer: 'Strait of Gibraltar',
+        hint: 'Connects the Atlantic Ocean to the Mediterranean Sea.',
+      },
+      {
+        id: 'tb-geo-6',
+        question: 'What massive wall spanning over 13,000 miles was built across northern China to defend against nomadic invasions?',
+        answer: 'The Great Wall of China',
+        hint: 'Construction began during the Qin Dynasty.',
+      },
+    ],
   },
   {
     id: 'brainteasers-and-riddles',
@@ -655,6 +731,38 @@ export const DEFAULT_GAMES: Game[] = [
             hint: 'The state of matter found in lightning, neon signs, and stars.',
           },
         ],
+      },
+    ],
+    tieBreakerQuestions: [
+      {
+        id: 'tb-riddle-1',
+        question: 'What is the only letter in the English alphabet that does not appear in any of the 50 US state names?',
+        answer: 'The Letter Q',
+        hint: 'Follows P in the alphabet.',
+      },
+      {
+        id: 'tb-riddle-2',
+        question: 'A doctor gives you 3 pills and tells you to take one every half hour. How many minutes will the pills last?',
+        answer: '60 Minutes (1 Hour)',
+        hint: 'You take the first one immediately at minute 0!',
+      },
+      {
+        id: 'tb-riddle-3',
+        question: 'The more you take, the more you leave behind. What am I?',
+        answer: 'Footsteps',
+        hint: 'You make them while walking.',
+      },
+      {
+        id: 'tb-riddle-4',
+        question: 'What has a head and a tail, is brown or silver, but has no body or legs?',
+        answer: 'A Coin',
+        hint: 'Flipped to make fair decisions.',
+      },
+      {
+        id: 'tb-riddle-5',
+        question: 'What 5-letter word becomes shorter when you add two letters to it?',
+        answer: 'Short',
+        hint: 'Add "er" to make shorter.',
       },
     ],
   },

@@ -208,6 +208,7 @@ export default function App() {
         activeQuestion: null,
         buzzedTeam: null,
         answeredQuestionIds: [],
+        tieBreakerQuestions: selectedGame.tieBreakerQuestions || [],
         defaultTimerSeconds,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -836,6 +837,25 @@ export default function App() {
             setTieBreakerWinnerId(winnerId);
             setShowTieBreaker(false);
             handleEndGame(winnerId);
+          }}
+          boardTieBreakerQuestions={activeGame?.tieBreakerQuestions}
+          boardTitle={activeGame?.title}
+          onSaveBoardTieBreakers={(newTBQuestions) => {
+            if (activeGame) {
+              const updatedGame: Game = {
+                ...activeGame,
+                tieBreakerQuestions: newTBQuestions,
+                updatedAt: new Date().toISOString(),
+              };
+              setActiveGame(updatedGame);
+              handleSaveGame(updatedGame);
+              if (activeSession?.id) {
+                updateDoc(doc(db, 'game_sessions', activeSession.id), {
+                  tieBreakerQuestions: newTBQuestions,
+                  updatedAt: new Date().toISOString(),
+                }).catch(() => {});
+              }
+            }
           }}
         />
       )}

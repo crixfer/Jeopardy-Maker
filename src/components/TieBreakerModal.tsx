@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Zap, Trophy, Bell, RotateCcw, CheckCircle2, XCircle, ArrowRight, X, Sparkles, HelpCircle, ShieldAlert } from 'lucide-react';
+import { Zap, Trophy, Bell, RotateCcw, CheckCircle2, XCircle, ArrowRight, X, Sparkles, HelpCircle, ShieldAlert, Edit3, Plus, Trash2, Shuffle } from 'lucide-react';
 import { Team, TieBreakerQuestion } from '../types/game';
 import { Avatar } from './Avatar';
 import { soundManager } from '../utils/soundEffects';
@@ -57,6 +57,9 @@ interface TieBreakerModalProps {
   onConfirmWinner: (winnerTeamId: string) => void;
   buzzedTeamId?: string | null;
   onClearBuzz?: () => void;
+  boardTieBreakerQuestions?: TieBreakerQuestion[];
+  boardTitle?: string;
+  onSaveBoardTieBreakers?: (questions: TieBreakerQuestion[]) => void;
 }
 
 export const TieBreakerModal: React.FC<TieBreakerModalProps> = ({
@@ -65,8 +68,41 @@ export const TieBreakerModal: React.FC<TieBreakerModalProps> = ({
   onConfirmWinner,
   buzzedTeamId,
   onClearBuzz,
+  boardTieBreakerQuestions,
+  boardTitle,
+  onSaveBoardTieBreakers,
 }) => {
   const teamsList = Object.values(teams);
+
+  // Pool of questions for this specific board (falls back to defaults if none defined)
+  const [questionsPool, setQuestionsPool] = useState<TieBreakerQuestion[]>(() => {
+    if (boardTieBreakerQuestions && boardTieBreakerQuestions.length > 0) {
+      return boardTieBreakerQuestions.slice(0, 10);
+    }
+    return DEFAULT_TIE_BREAKER_QUESTIONS;
+  });
+
+  const isContextual = Boolean(boardTieBreakerQuestions && boardTieBreakerQuestions.length > 0);
+
+  // Sync if prop updates
+  useEffect(() => {
+    if (boardTieBreakerQuestions && boardTieBreakerQuestions.length > 0) {
+      setQuestionsPool(boardTieBreakerQuestions.slice(0, 10));
+    }
+  }, [boardTieBreakerQuestions]);
+
+  // Maintain randomized sequence of indices for sudden-death questions in context
+  const [randomIndices, setRandomIndices] = useState<number[]>(() => {
+    const len = (boardTieBreakerQuestions && boardTieBreakerQuestions.length > 0)
+      ? boardTieBreakerQuestions.length
+      : DEFAULT_TIE_BREAKER_QUESTIONS.length;
+    const arr = Array.from({ length: len }, (_, i) => i);
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  });
 
   // Automatically find teams that tied for highest score
   const highestScore = Math.max(...teamsList.map((t) => t.score));
@@ -80,9 +116,6 @@ export const TieBreakerModal: React.FC<TieBreakerModalProps> = ({
   );
 
   const [questionIndex, setQuestionIndex] = useState<number>(0);
-  const [customQuestion, setCustomQuestion] = useState<string>('');
-  const [customAnswer, setCustomAnswer] = useState<string>('');
-  const [isCustomMode, setIsCustomMode] = useState<boolean>(false);
   const [isAnswerRevealed, setIsAnswerRevealed] = useState<boolean>(false);
   const [tieBreakerScores, setTieBreakerScores] = useState<Record<string, number>>({});
   const [winnerTeamId, setWinnerTeamId] = useState<string | null>(null);
@@ -90,7 +123,12 @@ export const TieBreakerModal: React.FC<TieBreakerModalProps> = ({
   const [isTimerPaused, setIsTimerPaused] = useState<boolean>(false);
   const [activeBuzzedId, setActiveBuzzedId] = useState<string | null>(buzzedTeamId || null);
 
-  const currentQ = DEFAULT_TIE_BREAKER_QUESTIONS[questionIndex % DEFAULT_TIE_BREAKER_QUESTIONS.length];
+  // In-modal editor state for editing board questions on the fly (max 10)
+  const [showQuestionsManager, setShowQuestionsManager] = useState<boolean>(false);
+  const [managerQuestions, setManagerQuestions] = useState<TieBreakerQuestion[]>([]);
+
+  const actualIndex = randomIndices[questionIndex % randomIndices.length] ?? (questionIndex % questionsPool.length);
+  const currentQ = questionsPool[actualIndex] || DEFAULT_TIE_BREAKER_QUESTIONS[0];
 
   // Sync prop buzz
   useEffect(() => {
@@ -183,20 +221,54 @@ export const TieBreakerModal: React.FC<TieBreakerModalProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setManagerQuestions([...questionsPool]);
+                setShowQuestionsManager(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all hover:border-amber-400"
+              title="Edit or add tie breaker questions specifically for this board (Max 10)"
+            >
+              <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+              <span>Edit Board Questions ({questionsPool.length}/10)</span>
+            </button>
+
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Notice Banner */}
-        <div className="bg-amber-500/10 border-b border-amber-500/20 px-6 py-2.5 flex items-center gap-2 text-xs text-amber-300">
+        <div className="bg-amber-500/10 border-b border-amber-500/20 px-6 py-2 flex items-center gap-2 text-xs text-amber-300">
           <ShieldAlert className="w-4 h-4 shrink-0 text-amber-400" />
           <span>
             <strong>Isolated Scoring:</strong> Points earned in this tie breaker session decide the winner of this match only and will NOT inflate normal board points.
           </span>
+        </div>
+
+        {/* Board Context Bar */}
+        <div className="bg-slate-950/80 border-b border-slate-800 px-6 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="font-bold text-slate-300">
+              Board Theme: <strong className="text-amber-300 font-black">{boardTitle || 'Active Game Board'}</strong>
+            </span>
+            <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-[10px] font-bold border border-indigo-500/40">
+              {isContextual ? 'In Context Pool' : 'Default Pool'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-slate-400 font-mono">
+              Random Question {((questionIndex) % questionsPool.length) + 1} of {questionsPool.length} (Max 10)
+            </span>
+          </div>
         </div>
 
         {/* Modal Body */}
@@ -271,8 +343,16 @@ export const TieBreakerModal: React.FC<TieBreakerModalProps> = ({
 
               {/* Question Text */}
               <p className="text-lg sm:text-2xl font-black text-white leading-relaxed">
-                "{isCustomMode && customQuestion ? customQuestion : currentQ.question}"
+                "{currentQ.question}"
               </p>
+
+              {/* Teacher Hint */}
+              {currentQ.hint && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 font-medium">
+                  <span className="font-bold">💡 Hint:</span>
+                  <span>{currentQ.hint}</span>
+                </div>
+              )}
 
               {/* Answer Box */}
               {isAnswerRevealed ? (
@@ -281,7 +361,7 @@ export const TieBreakerModal: React.FC<TieBreakerModalProps> = ({
                     Answer
                   </span>
                   <p className="text-base sm:text-xl font-black text-white">
-                    {isCustomMode && customAnswer ? customAnswer : currentQ.answer}
+                    {currentQ.answer}
                   </p>
                 </div>
               ) : (
@@ -397,10 +477,10 @@ export const TieBreakerModal: React.FC<TieBreakerModalProps> = ({
           <button
             type="button"
             onClick={handleNextQuestion}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs border border-slate-700 transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 transition-all hover:scale-105 active:scale-95"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Next Tie Breaker Question</span>
+            <Shuffle className="w-3.5 h-3.5" />
+            <span>Next Random Question 🎲</span>
           </button>
 
           <button
@@ -412,6 +492,173 @@ export const TieBreakerModal: React.FC<TieBreakerModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* In-Modal Questions Manager Drawer / Modal */}
+      {showQuestionsManager && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-fadeIn">
+          <div className="bg-slate-900 border-2 border-amber-500 rounded-3xl p-5 sm:p-7 max-w-2xl w-full shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                  <Edit3 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-black text-white">
+                    Edit Tie Breakers for "{boardTitle || 'This Board'}"
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Add or modify up to 10 contextual questions so sudden death stays focused on your topic.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowQuestionsManager(false)}
+                className="text-slate-400 hover:text-white font-bold p-1 text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between bg-slate-950/70 p-3 rounded-2xl border border-slate-800">
+              <span className={`text-xs font-black px-2.5 py-1 rounded-full border ${
+                managerQuestions.length >= 10
+                  ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                  : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+              }`}>
+                {managerQuestions.length} / 10 Max Questions
+              </span>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (managerQuestions.length >= 10) return;
+                  const newQ: TieBreakerQuestion = {
+                    id: `tb-${Date.now()}`,
+                    question: '',
+                    answer: '',
+                    hint: '',
+                  };
+                  setManagerQuestions([...managerQuestions, newQ]);
+                }}
+                disabled={managerQuestions.length >= 10}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Add Question</span>
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 space-y-3 pr-1">
+              {managerQuestions.length === 0 ? (
+                <div className="text-center py-8 text-xs text-slate-500">
+                  No questions yet. Click "Add Question" above to add contextual sudden death challenges.
+                </div>
+              ) : (
+                managerQuestions.map((q, idx) => (
+                  <div key={q.id} className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                      <span className="text-xs font-mono font-bold text-amber-400">#{idx + 1} Question</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setManagerQuestions(managerQuestions.filter((_, i) => i !== idx));
+                        }}
+                        className="text-slate-500 hover:text-rose-400 text-xs p-1"
+                        title="Delete Question"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+                        Question Prompt
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Which planet is closest to the Sun?"
+                        value={q.question}
+                        onChange={(e) => {
+                          const copy = [...managerQuestions];
+                          copy[idx] = { ...q, question: e.target.value };
+                          setManagerQuestions(copy);
+                        }}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-400"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-bold text-emerald-400 uppercase mb-1">
+                          Correct Answer
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Mercury"
+                          value={q.answer}
+                          onChange={(e) => {
+                            const copy = [...managerQuestions];
+                            copy[idx] = { ...q, answer: e.target.value };
+                            setManagerQuestions(copy);
+                          }}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-emerald-300 font-bold placeholder-slate-600 focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">
+                          Hint (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Named after Roman messenger god"
+                          value={q.hint || ''}
+                          onChange={(e) => {
+                            const copy = [...managerQuestions];
+                            copy[idx] = { ...q, hint: e.target.value };
+                            setManagerQuestions(copy);
+                          }}
+                          className="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-slate-300 placeholder-slate-600 focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-slate-800 flex justify-between items-center">
+              <button
+                type="button"
+                onClick={() => setShowQuestionsManager(false)}
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const valid = managerQuestions.filter((q) => q.question.trim().length > 0);
+                  const finalPool = valid.length > 0 ? valid : DEFAULT_TIE_BREAKER_QUESTIONS;
+                  setQuestionsPool(finalPool);
+                  const len = finalPool.length;
+                  const arr = Array.from({ length: len }, (_, i) => i);
+                  for (let i = arr.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [arr[i], arr[j]] = [arr[j], arr[i]];
+                  }
+                  setRandomIndices(arr);
+                  setQuestionIndex(0);
+                  setIsAnswerRevealed(false);
+                  onSaveBoardTieBreakers?.(valid);
+                  setShowQuestionsManager(false);
+                }}
+                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs shadow-md transition-all hover:scale-105 active:scale-95"
+              >
+                Save to Board
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
