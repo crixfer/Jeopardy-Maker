@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Maximize2, Minimize2, Share2, Copy, Check, Users, Trophy, Settings, Plus, Sparkles, RefreshCw, QrCode, Zap, Sliders, Music } from 'lucide-react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { Maximize2, Minimize2, Share2, Copy, Check, Users, Trophy, Settings, Plus, Sparkles, RefreshCw, QrCode, Zap, Sliders, Music, Dices } from 'lucide-react';
 import { Game, Category, Question, Team } from '../types/game';
 import { Avatar } from './Avatar';
 import { soundManager } from '../utils/soundEffects';
@@ -45,6 +45,24 @@ export const BoardView: React.FC<BoardViewProps> = ({
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
 
+  // Mystery Roulette Random Question Picker State
+  const [isRouletteActive, setIsRouletteActive] = useState<boolean>(false);
+  const [rouletteHighlightedId, setRouletteHighlightedId] = useState<string | null>(null);
+  const [rouletteWinnerInfo, setRouletteWinnerInfo] = useState<{
+    categoryTitle: string;
+    points: number;
+  } | null>(null);
+  const rouletteTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Clean up any timeouts if component unmounts
+  useEffect(() => {
+    return () => {
+      if (rouletteTimeoutRef.current) {
+        clearTimeout(rouletteTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(() => {});
@@ -73,6 +91,99 @@ export const BoardView: React.FC<BoardViewProps> = ({
     return answeredQuestionIds.includes(questionId);
   };
 
+  // Compile list of all currently unanswered questions on the board
+  const unansweredQuestions = useMemo(() => {
+    const list: {
+      category: Category;
+      question: Question;
+      rowIndex: number;
+    }[] = [];
+
+    categories.forEach((cat) => {
+      cat.questions?.forEach((q, rIdx) => {
+        if (!isQuestionAnswered(q.id)) {
+          list.push({
+            category: cat,
+            question: q,
+            rowIndex: rIdx,
+          });
+        }
+      });
+    });
+
+    return list;
+  }, [categories, answeredQuestionIds]);
+
+  // Mystery Question Roulette with thrilling fast-to-slow deceleration
+  const handleStartRoulette = () => {
+    if (isRouletteActive || unansweredQuestions.length === 0) return;
+
+    setIsRouletteActive(true);
+    setRouletteWinnerInfo(null);
+
+    // Pick target winner question in advance
+    const targetIndex = Math.floor(Math.random() * unansweredQuestions.length);
+    const target = unansweredQuestions[targetIndex];
+
+    // Deceleration schedule (milliseconds): starts blazing fast and progressively decelerates
+    const DELAYS = [
+      40, 40, 45, 45, 50, 50, 55, 60, 70, 80,
+      95, 115, 140, 175, 220, 275, 345, 430, 530, 650, 800
+    ];
+
+    // Build the hopping journey across the board
+    const sequence: typeof unansweredQuestions[0][] = [];
+    let lastChosenId = '';
+
+    for (let i = 0; i < DELAYS.length - 1; i++) {
+      const pool = unansweredQuestions.filter((q) => q.question.id !== lastChosenId);
+      const chosen = pool.length > 0
+        ? pool[Math.floor(Math.random() * pool.length)]
+        : unansweredQuestions[Math.floor(Math.random() * unansweredQuestions.length)];
+      sequence.push(chosen);
+      lastChosenId = chosen.question.id;
+    }
+    // Final destination: the winning target question
+    sequence.push(target);
+
+    // Recursive execution with dynamic decelerating delays
+    const runStep = (stepIndex: number) => {
+      if (stepIndex >= sequence.length) return;
+
+      const currentItem = sequence[stepIndex];
+      const isFinal = stepIndex === sequence.length - 1;
+
+      setRouletteHighlightedId(currentItem.question.id);
+
+      if (!isFinal) {
+        // Sound pitch ascends slightly as anticipation peaks
+        const progress = stepIndex / sequence.length;
+        soundManager.playRouletteTick(0.85 + progress * 0.45);
+
+        rouletteTimeoutRef.current = setTimeout(() => {
+          runStep(stepIndex + 1);
+        }, DELAYS[stepIndex]);
+      } else {
+        // Grand finale landing!
+        soundManager.playRouletteWin();
+        setRouletteWinnerInfo({
+          categoryTitle: currentItem.category.title,
+          points: currentItem.question.points,
+        });
+
+        // Hold winning card highlighted for dramatic suspense before launching
+        rouletteTimeoutRef.current = setTimeout(() => {
+          setIsRouletteActive(false);
+          setRouletteHighlightedId(null);
+          setRouletteWinnerInfo(null);
+          onSelectQuestion(currentItem.category, currentItem.question, currentItem.rowIndex);
+        }, 950);
+      }
+    };
+
+    runStep(0);
+  };
+
   return (
     <div className="flex-1 flex flex-col justify-between p-3 sm:p-6 max-w-7xl mx-auto w-full">
       {/* Top Controls & Game Header */}
@@ -89,11 +200,36 @@ export const BoardView: React.FC<BoardViewProps> = ({
         </div>
 
         {/* Action Badges */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+          {/* Mystery Roulette Random Picker Button */}
+          <button
+            type="button"
+            onClick={handleStartRoulette}
+            disabled={isRouletteActive || unansweredQuestions.length === 0}
+            className={`flex items-center gap-2 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl font-black text-xs sm:text-sm transition-all shadow-md select-none ${
+              isRouletteActive
+                ? 'bg-gradient-to-r from-purple-600 via-pink-600 to-amber-500 text-white animate-pulse shadow-purple-500/50 scale-105 ring-2 ring-amber-300'
+                : unansweredQuestions.length === 0
+                ? 'bg-slate-800 text-slate-500 border border-slate-700 cursor-not-allowed opacity-60'
+                : 'bg-gradient-to-r from-purple-600 via-fuchsia-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-purple-600/30 hover:shadow-purple-500/50 hover:scale-105 active:scale-95 border-2 border-purple-400/50 cursor-pointer'
+            }`}
+            title={
+              unansweredQuestions.length === 0
+                ? 'All questions on the board have already been answered!'
+                : isRouletteActive
+                ? 'Spinning Mystery Roulette...'
+                : 'Random Mystery Question: Click for a dramatic fast-to-slow roulette pick!'
+            }
+          >
+            <Dices className={`w-4 h-4 ${isRouletteActive ? 'animate-spin text-amber-300' : 'text-amber-300'}`} />
+            <span>{isRouletteActive ? 'Choosing...' : 'Mystery Pick 🎲'}</span>
+          </button>
+
           {/* Live Session PIN & QR Code trigger */}
           {sessionPin && (
             <button
               onClick={() => setShowShareModal(true)}
+              disabled={isRouletteActive}
               className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-indigo-600/30 via-purple-600/30 to-indigo-600/30 border-2 border-indigo-400/60 hover:border-amber-400 text-indigo-200 hover:text-white transition-all font-mono font-bold text-xs sm:text-sm shadow-md shadow-indigo-950/50 hover:scale-105 active:scale-95"
               title="Click to display QR code for students to join with phones"
             >
@@ -195,6 +331,19 @@ export const BoardView: React.FC<BoardViewProps> = ({
         </div>
       </div>
 
+      {/* Thrill Roulette Indicator Banner */}
+      {isRouletteActive && (
+        <div className="mb-3 py-2.5 px-4 rounded-2xl bg-gradient-to-r from-amber-500/20 via-yellow-500/30 to-amber-500/20 border-2 border-amber-400 text-amber-200 text-center font-black flex items-center justify-center gap-2.5 shadow-xl shadow-amber-500/20 animate-pulse">
+          <Sparkles className="w-5 h-5 text-amber-300 animate-spin" />
+          <span className="text-xs sm:text-sm md:text-base uppercase tracking-wider text-amber-300 font-black">
+            {rouletteWinnerInfo
+              ? `🎯 Landed On: ${rouletteWinnerInfo.categoryTitle} for ${rouletteWinnerInfo.points} Points!`
+              : '🎲 Mystery Question Roulette: Selecting a surprise card...'}
+          </span>
+          <Sparkles className="w-5 h-5 text-amber-300 animate-spin" />
+        </div>
+      )}
+
       {/* Main Jeopardy Board Grid */}
       <div className="flex-1 bg-slate-950/80 border-2 border-indigo-900/60 rounded-3xl p-3 sm:p-5 shadow-2xl overflow-x-auto min-h-[420px] flex flex-col justify-center">
         <div
@@ -228,18 +377,26 @@ export const BoardView: React.FC<BoardViewProps> = ({
                 }
 
                 const answered = isQuestionAnswered(question.id);
+                const isRouletteTarget = rouletteHighlightedId === question.id;
+                const isFinalWinner = !!rouletteWinnerInfo && isRouletteTarget;
 
                 return (
                   <button
                     key={question.id}
-                    disabled={answered}
+                    disabled={answered || isRouletteActive}
                     onClick={() => {
                       soundManager.playFlip();
                       onSelectQuestion(category, question, rowIndex);
                     }}
-                    className={`relative rounded-2xl p-2 sm:p-4 font-black transition-all duration-200 select-none flex items-center justify-center min-h-[65px] sm:min-h-[80px] ${
+                    className={`relative rounded-2xl p-2 sm:p-4 font-black transition-all duration-150 select-none flex items-center justify-center min-h-[65px] sm:min-h-[80px] ${
                       answered
                         ? 'bg-slate-900/40 border border-slate-800/60 text-slate-700 cursor-not-allowed shadow-inner'
+                        : isFinalWinner
+                        ? 'bg-gradient-to-br from-amber-400 via-yellow-300 to-amber-500 text-slate-950 ring-4 ring-amber-300 ring-offset-4 ring-offset-slate-950 scale-110 z-30 shadow-[0_0_40px_rgba(251,191,36,1)] animate-bounce font-black'
+                        : isRouletteTarget
+                        ? 'bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 text-white ring-4 ring-cyan-300 ring-offset-2 ring-offset-slate-950 scale-105 z-20 shadow-[0_0_35px_rgba(6,182,212,0.95)]'
+                        : isRouletteActive
+                        ? 'bg-gradient-to-b from-blue-900/30 via-indigo-950/30 to-indigo-950/30 border border-indigo-900/40 text-indigo-400/40 opacity-40 grayscale-[30%] cursor-not-allowed'
                         : 'bg-gradient-to-b from-blue-700 via-indigo-700 to-indigo-800 hover:from-blue-600 hover:to-indigo-700 border-2 border-indigo-400/50 hover:border-amber-400 text-amber-300 hover:text-white shadow-lg hover:shadow-indigo-500/30 hover:scale-[1.03] active:scale-95 cursor-pointer'
                     }`}
                   >
@@ -247,6 +404,24 @@ export const BoardView: React.FC<BoardViewProps> = ({
                       <span className="text-xs sm:text-sm font-bold text-slate-600 tracking-wider">
                         ✓ DONE
                       </span>
+                    ) : isFinalWinner ? (
+                      <div className="flex flex-col items-center">
+                        <span className="text-xl sm:text-3xl font-black tracking-tight text-slate-950 drop-shadow-sm">
+                          {question.points}
+                        </span>
+                        <span className="text-[10px] sm:text-xs font-black uppercase tracking-wider text-amber-950 bg-amber-200/90 px-1.5 py-0.5 rounded-full mt-0.5 shadow-sm">
+                          ★ CHOSEN! ★
+                        </span>
+                      </div>
+                    ) : isRouletteTarget ? (
+                      <div className="flex flex-col items-center">
+                        <span className="text-xl sm:text-3xl font-black drop-shadow tracking-tight text-white">
+                          {question.points}
+                        </span>
+                        <span className="text-[9px] font-bold uppercase tracking-widest text-cyan-200 animate-pulse">
+                          🎯 FOCUS
+                        </span>
+                      </div>
                     ) : (
                       <div className="flex flex-col items-center">
                         <span className="text-lg sm:text-2xl md:text-3xl font-black drop-shadow tracking-tight">

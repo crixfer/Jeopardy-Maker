@@ -329,6 +329,57 @@ export const soundManager = {
     osc.stop(ctx.currentTime + 0.3);
   },
 
+  // Mystery Roulette Card Hop Tick: Crisp mechanical game-show tick with variable pitch
+  playRouletteTick(pitchMultiplier: number = 1) {
+    const vol = getEffectiveVolume(currentSettings.timerVolume);
+    if (vol <= 0) return;
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(640 * pitchMultiplier, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(320 * pitchMultiplier, ctx.currentTime + 0.045);
+
+    gain.gain.setValueAtTime(0.24 * vol, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.045);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.05);
+  },
+
+  // Mystery Roulette Final Choice Landing Fanfare
+  playRouletteWin() {
+    const vol = getEffectiveVolume(currentSettings.correctVolume);
+    if (vol <= 0) return;
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5, E5, G5, C6
+    notes.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.07);
+
+      gain.gain.setValueAtTime(0, ctx.currentTime + idx * 0.07);
+      gain.gain.linearRampToValueAtTime(0.32 * vol, ctx.currentTime + idx * 0.07 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.07 + 0.4);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(ctx.currentTime + idx * 0.07);
+      osc.stop(ctx.currentTime + idx * 0.07 + 0.45);
+    });
+  },
+
   // Daily Double Fanfare
   playDailyDouble() {
     const vol = getEffectiveVolume(currentSettings.correctVolume);
