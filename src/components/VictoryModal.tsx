@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import confetti from 'canvas-confetti';
-import { Trophy, Medal, Star, Sparkles, RotateCcw, Award, ArrowRight, Zap } from 'lucide-react';
+import { Trophy, Medal, Star, Sparkles, RotateCcw, Award, ArrowRight, Zap, Home, X } from 'lucide-react';
 import { Team } from '../types/game';
 import { Avatar } from './Avatar';
 import { soundManager } from '../utils/soundEffects';
@@ -12,6 +12,7 @@ interface VictoryModalProps {
   onPlayAgain: () => void;
   onViewLeaderboard: () => void;
   onClose: () => void;
+  onBackToMain: () => void;
   onStartTieBreaker?: () => void;
   designatedWinnerId?: string | null;
 }
@@ -21,6 +22,7 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
   onPlayAgain,
   onViewLeaderboard,
   onClose,
+  onBackToMain,
   onStartTieBreaker,
   designatedWinnerId,
 }) => {
@@ -69,7 +71,25 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fadeIn">
-      <div className="w-full max-w-2xl bg-slate-900 border-2 border-amber-500/70 rounded-3xl shadow-2xl shadow-amber-500/20 overflow-hidden flex flex-col text-center p-6 sm:p-8 space-y-6">
+      <div className="w-full max-w-2xl bg-slate-900 border-2 border-amber-500/70 rounded-3xl shadow-2xl shadow-amber-500/20 overflow-hidden flex flex-col text-center p-6 sm:p-8 space-y-6 relative">
+        {/* Top-right quick exit buttons */}
+        <div className="absolute top-4 right-4 flex items-center gap-1.5 z-10">
+          <button
+            onClick={onBackToMain}
+            className="p-1.5 rounded-xl bg-slate-800/80 hover:bg-emerald-600/80 text-slate-300 hover:text-white transition-colors"
+            title="Return to Main Page"
+          >
+            <Home className="w-4 h-4" />
+          </button>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+            title="Review Board"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
         {/* Banner */}
         <div className="space-y-1">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-black uppercase tracking-wider">
@@ -195,9 +215,20 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+          {/* Recommended: Return to Main Page to host another game */}
+          <button
+            onClick={onBackToMain}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-sm shadow-lg shadow-emerald-600/30 transition-all hover:scale-105 active:scale-95"
+            title="Return to the main page to choose or create a different game board"
+          >
+            <Home className="w-4 h-4" />
+            <span>Host Different Game</span>
+          </button>
+
           <button
             onClick={onPlayAgain}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm shadow-lg shadow-amber-500/20 transition-all hover:scale-105 active:scale-95"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm shadow-md transition-all hover:scale-105 active:scale-95"
+            title="Reset scores and play this same board again"
           >
             <RotateCcw className="w-4 h-4" />
             <span>Play Again</span>
@@ -205,15 +236,16 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
 
           <button
             onClick={onViewLeaderboard}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm shadow-md transition-all hover:scale-105 active:scale-95"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm shadow-md transition-all hover:scale-105 active:scale-95"
           >
             <Trophy className="w-4 h-4 text-amber-300" />
-            <span>View Hall of Fame</span>
+            <span>Hall of Fame</span>
           </button>
 
           <button
             onClick={onClose}
-            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-sm transition-colors"
+            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-sm transition-colors"
+            title="Keep board visible to review answers with class"
           >
             Review Board
           </button>

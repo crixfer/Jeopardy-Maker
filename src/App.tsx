@@ -662,8 +662,9 @@ export default function App() {
     } catch {}
   };
 
-  // Restart / Reset
+  // Restart / Reset to Main Lobby
   const handleResetToLobby = () => {
+    soundManager.stopMusic();
     setActiveGame(null);
     setActiveSession(null);
     setIsWaitingRoomActive(false);
@@ -672,6 +673,7 @@ export default function App() {
     setShowVictory(false);
     setShowTieBreaker(false);
     setTieBreakerWinnerId(null);
+    setAnsweredQuestionIds([]);
     setCurrentTab('play');
   };
 
@@ -698,12 +700,8 @@ export default function App() {
         onOpenSoundSettings={() => {
           if (!isStudentMode) setShowSoundSettings(true);
         }}
-        onNewGameClick={() => {
-          soundManager.stopMusic();
-          setActiveGame(null);
-          setIsWaitingRoomActive(false);
-          setCurrentTab('play');
-        }}
+        onNewGameClick={handleResetToLobby}
+        onLogoClick={handleResetToLobby}
         isStudentJoined={isStudentMode}
       />
 
@@ -753,6 +751,7 @@ export default function App() {
                 onEndGame={handleEndGame}
                 onStartTieBreaker={() => setShowTieBreaker(true)}
                 onOpenSoundSettings={() => setShowSoundSettings(true)}
+                onBackToMain={handleResetToLobby}
                 sessionPin={activeSession?.pin}
                 onAdjustTeamScore={handleAdjustTeamScore}
                 onAddTeam={handleAddTeamOnTheFly}
@@ -888,6 +887,7 @@ export default function App() {
             setShowVictory(false);
             setCurrentTab('leaderboard');
           }}
+          onBackToMain={handleResetToLobby}
           onClose={() => setShowVictory(false)}
         />
       )}

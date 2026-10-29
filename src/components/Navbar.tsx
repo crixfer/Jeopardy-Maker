@@ -9,6 +9,7 @@ interface NavbarProps {
   setIsMuted: (muted: boolean) => void;
   onOpenSoundSettings: () => void;
   onNewGameClick: () => void;
+  onLogoClick?: () => void;
   isStudentJoined?: boolean;
 }
 
@@ -19,6 +20,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   setIsMuted,
   onOpenSoundSettings,
   onNewGameClick,
+  onLogoClick,
   isStudentJoined = false,
 }) => {
   const toggleMute = () => {
@@ -27,16 +29,27 @@ export const Navbar: React.FC<NavbarProps> = ({
     soundManager.setIsMuted(nextState);
   };
 
+  const handleLogoClick = () => {
+    if (isStudentJoined) {
+      setCurrentTab('buzzer');
+    } else if (onLogoClick) {
+      onLogoClick();
+    } else {
+      onNewGameClick();
+    }
+  };
+
   return (
     <header className="sticky top-0 z-40 bg-slate-900/95 backdrop-blur-md border-b border-indigo-900/60 shadow-lg text-white w-full">
       {/* Top Header Row */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 flex items-center justify-between h-14 sm:h-16">
-        {/* Brand Logo - JOYPARDY */}
+        {/* Brand Logo - JOYPARDY (Click to return to Main Page) */}
         <div 
-          onClick={() => setCurrentTab(isStudentJoined ? 'buzzer' : 'play')}
+          onClick={handleLogoClick}
           className="flex items-center gap-2 sm:gap-3 cursor-pointer group select-none shrink-0"
+          title="JOYPARDY - Click to return to Main Page"
         >
-          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-indigo-600 to-purple-600 p-[2px] shadow-lg shadow-indigo-500/25 group-hover:scale-105 transition-transform">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500 via-indigo-600 to-purple-600 p-[2px] shadow-lg shadow-indigo-500/25 group-hover:scale-105 active:scale-95 transition-transform">
             <div className="w-full h-full bg-slate-900 rounded-[10px] flex items-center justify-center">
               <span className="text-base sm:text-xl font-black bg-gradient-to-br from-amber-300 via-yellow-400 to-amber-500 bg-clip-text text-transparent">
                 J!

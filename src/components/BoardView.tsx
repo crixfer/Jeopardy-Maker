@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Maximize2, Minimize2, Share2, Copy, Check, Users, Trophy, Settings, Plus, Sparkles, RefreshCw, QrCode, Zap, Sliders, Music, Dices } from 'lucide-react';
+import { Maximize2, Minimize2, Share2, Copy, Check, Users, Trophy, Settings, Plus, Sparkles, RefreshCw, QrCode, Zap, Sliders, Music, Dices, Home } from 'lucide-react';
 import { Game, Category, Question, Team } from '../types/game';
 import { Avatar } from './Avatar';
 import { soundManager } from '../utils/soundEffects';
@@ -22,6 +22,7 @@ interface BoardViewProps {
   setPenaltyForWrong: (val: boolean) => void;
   defaultTimerSeconds: number;
   setDefaultTimerSeconds: (sec: number) => void;
+  onBackToMain?: () => void;
 }
 
 export const BoardView: React.FC<BoardViewProps> = ({
@@ -39,6 +40,7 @@ export const BoardView: React.FC<BoardViewProps> = ({
   setPenaltyForWrong,
   defaultTimerSeconds,
   setDefaultTimerSeconds,
+  onBackToMain,
 }) => {
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showShareModal, setShowShareModal] = useState<boolean>(false);
@@ -333,8 +335,55 @@ export const BoardView: React.FC<BoardViewProps> = ({
             <Trophy className="w-4 h-4" />
             <span>Finish Game</span>
           </button>
+
+          {/* Main Page / Host Different Game */}
+          {onBackToMain && (
+            <button
+              onClick={onBackToMain}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 font-bold text-xs sm:text-sm transition-all hover:scale-105 active:scale-95"
+              title="Return to the Main Page to host a different game"
+            >
+              <Home className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Main Page</span>
+            </button>
+          )}
         </div>
       </div>
+
+      {/* All Questions Completed Celebration Banner */}
+      {unansweredQuestions.length === 0 && !isRouletteActive && (
+        <div className="mb-4 py-3 px-4 sm:px-6 rounded-2xl bg-gradient-to-r from-amber-500/20 via-emerald-500/20 to-indigo-500/20 border-2 border-amber-400 flex flex-wrap items-center justify-between gap-3 shadow-xl">
+          <div className="flex items-center gap-2.5 text-left">
+            <Trophy className="w-6 h-6 text-amber-400 shrink-0 animate-bounce" />
+            <div>
+              <h3 className="text-sm sm:text-base font-black text-white">
+                All Board Questions Completed!
+              </h3>
+              <p className="text-xs text-slate-300">
+                This game has concluded. Crown your classroom champions or return to the main page to host a different game.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onEndGame}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs sm:text-sm shadow-md transition-all hover:scale-105 active:scale-95"
+            >
+              <Trophy className="w-4 h-4" />
+              <span>View Champions</span>
+            </button>
+            {onBackToMain && (
+              <button
+                onClick={onBackToMain}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm shadow-md transition-all hover:scale-105 active:scale-95"
+              >
+                <Home className="w-4 h-4" />
+                <span>Host Different Game</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Thrill Roulette Indicator Banner */}
       {isRouletteActive && (
