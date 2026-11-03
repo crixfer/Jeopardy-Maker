@@ -29,6 +29,9 @@ import {
   query,
   where,
   getDocs,
+  runTransaction,
+  arrayUnion,
+  deleteField,
 } from 'firebase/firestore';
 
 export default function App() {
@@ -72,15 +75,36 @@ export default function App() {
   const lastTickSecondRef = useRef<number>(-1);
   const timeUpSoundFiredRef = useRef<boolean>(false);
 
-  // Initialize sound, test connection, and check for QR code join parameter
+  // Initialize sound, test connection, and check for QR code join parameter / student session reconnection
   useEffect(() => {
     soundManager.initSound();
     testConnection().catch(() => {});
 
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('pin') || params.get('join')) {
+      const urlPin = params.get('pin') || params.get('join') || localStorage.getItem('edujeopardy_student_active_pin');
+      if (urlPin) {
+        const cleanPin = urlPin.toUpperCase().trim();
         setCurrentTab('buzzer');
+
+        // Automatically fetch and subscribe to the active session for this PIN
+        const sessionsRef = collection(db, 'game_sessions');
+        const q = query(sessionsRef, where('pin', '==', cleanPin));
+        getDocs(q).then((querySnap) => {
+          if (!querySnap.empty) {
+            const sessionDoc = querySnap.docs[0];
+            const sessionData = sessionDoc.data() as GameSession;
+            setActiveSession(sessionData);
+
+            // Reconnect student team ID if saved on this device
+            try {
+              const savedTeamId = localStorage.getItem(`edujeopardy_student_team_${cleanPin}`);
+              if (savedTeamId && sessionData.teams?.[savedTeamId]) {
+                setStudentJoinedTeamId(savedTeamId);
+              }
+            } catch {}
+          }
+        }).catch(() => {});
       }
     }
   }, []);
@@ -396,6 +420,25 @@ export default function App() {
       setActiveQuestion(null);
       setBuzzedTeam(null);
 
+      // Auto-finish game when there are no ties or questions to answer
+      const totalBoardQuestions = activeGame
+        ? activeGame.categories.reduce((acc, cat) => acc + (cat.questions?.length || 0), 0)
+        : 0;
+      const allCompleted = totalBoardQuestions > 0 && newAnswered.length >= totalBoardQuestions;
+      if (allCompleted) {
+        const sorted = Object.values(updatedTeams).sort((a, b) => b.score - a.score);
+        const isTie = sorted.length > 1 && sorted[0].score === sorted[1].score;
+        if (!isTie) {
+          setTimeout(() => {
+            handleEndGame();
+          }, 700);
+        } else {
+          setTimeout(() => {
+            setShowTieBreaker(true);
+          }, 700);
+        }
+      }
+
       // Sync to Firestore
       if (activeSession?.id) {
         const path = `game_sessions/${activeSession.id}`;
@@ -466,6 +509,37 @@ export default function App() {
         } catch (err) {
           console.warn('Score adjustment note:', err);
         }
+      }
+    }
+  };
+
+  // Teacher kicks/removes a team from the live game
+  const handleKickTeam = async (teamId: string) => {
+    const updated = { ...teams };
+    delete updated[teamId];
+    setTeams(updated);
+
+    if (buzzedTeam?.teamId === teamId) {
+      const remaining = (activeSession?.buzzerQueue || []).filter((b) => b.teamId !== teamId);
+      setBuzzedTeam(remaining.length > 0 ? remaining[0] : null);
+    }
+
+    if (activeSession?.id) {
+      try {
+        const remainingQueue = (activeSession.buzzerQueue || []).filter((b) => b.teamId !== teamId);
+        const nextBuzzed = remainingQueue.length > 0 ? remainingQueue[0] : null;
+        const nextStatus = nextBuzzed ? 'question_buzzed' : (activeQuestion ? 'question_open' : activeSession.status);
+
+        await updateDoc(doc(db, 'game_sessions', activeSession.id), {
+          [`teams.${teamId}`]: deleteField(),
+          kickedTeamIds: arrayUnion(teamId),
+          buzzerQueue: remainingQueue,
+          buzzedTeam: nextBuzzed,
+          status: nextStatus,
+          updatedAt: new Date().toISOString(),
+        });
+      } catch (err) {
+        console.warn('Kick team note:', err);
       }
     }
   };
@@ -568,8 +642,15 @@ export default function App() {
           (t) => t.name.toLowerCase() === teamInfo.name.toLowerCase().trim()
         );
         if (existingTeam) {
+          if (sessionData.kickedTeamIds?.includes(existingTeam.id)) {
+            return { success: false, error: 'This team was removed by the teacher. Please choose another name.' };
+          }
           setActiveSession(sessionData);
           setStudentJoinedTeamId(existingTeam.id);
+          try {
+            localStorage.setItem('edujeopardy_student_active_pin', cleanPin);
+            localStorage.setItem(`edujeopardy_student_team_${cleanPin}`, existingTeam.id);
+          } catch {}
           return { success: true, teamId: existingTeam.id };
         }
       }
@@ -601,6 +682,10 @@ export default function App() {
         teams: updatedTeams,
       });
       setStudentJoinedTeamId(teamId);
+      try {
+        localStorage.setItem('edujeopardy_student_active_pin', cleanPin);
+        localStorage.setItem(`edujeopardy_student_team_${cleanPin}`, teamId);
+      } catch {}
       return { success: true, teamId };
     } catch (err: unknown) {
       return {
@@ -610,42 +695,53 @@ export default function App() {
     }
   };
 
-  // Student Buzzes In (Supports first-to-buzz priority queue and second chances)
+  // Student Buzzes In (Supports atomic priority queueing via transaction, preventing race-condition overwrites)
   const handleStudentBuzzIn = async (sessionId: string, teamId: string) => {
-    const team = activeSession?.teams?.[teamId] || teams[teamId];
-    if (!team) return;
-
-    // Disallow buzz if team already attempted and missed this question
-    if (activeSession?.attemptedTeamIds?.includes(teamId)) return;
-
-    const currentQueue = activeSession?.buzzerQueue || [];
-    // Disallow duplicate queueing
-    if (currentQueue.some((item) => item.teamId === teamId)) return;
-
-    const buzzPayload: BuzzerQueueItem = {
-      teamId,
-      teamName: team.name,
-      avatarId: team.avatarId,
-      buzzedAt: Date.now(),
-    };
-
-    const updatedQueue = [...currentQueue, buzzPayload];
-    const firstInQueue = updatedQueue[0];
-
-    setBuzzedTeam(firstInQueue);
-
-    const path = `game_sessions/${sessionId}`;
+    const sessionRef = doc(db, 'game_sessions', sessionId);
     try {
-      await updateDoc(doc(db, 'game_sessions', sessionId), {
-        buzzedTeam: firstInQueue,
-        buzzerQueue: updatedQueue,
-        status: 'question_buzzed',
-        lastAction: 'buzz',
-        lastActionTimestamp: Date.now(),
-        updatedAt: new Date().toISOString(),
+      await runTransaction(db, async (transaction) => {
+        const sessionSnap = await transaction.get(sessionRef);
+        if (!sessionSnap.exists()) return;
+        const sessionData = sessionSnap.data() as GameSession;
+
+        // Disallow buzz if question is not open or already finished
+        if (sessionData.status !== 'question_open' && sessionData.status !== 'question_buzzed') {
+          return;
+        }
+
+        // Verify team exists and is not kicked by instructor
+        const team = sessionData.teams?.[teamId] || teams[teamId];
+        if (!team) return;
+        if (sessionData.kickedTeamIds?.includes(teamId)) return;
+
+        // Disallow buzz if team already attempted and missed this question
+        if (sessionData.attemptedTeamIds?.includes(teamId)) return;
+
+        const currentQueue = sessionData.buzzerQueue || [];
+        // Disallow duplicate queueing
+        if (currentQueue.some((item) => item.teamId === teamId)) return;
+
+        const buzzPayload: BuzzerQueueItem = {
+          teamId,
+          teamName: team.name,
+          avatarId: team.avatarId,
+          buzzedAt: Date.now(),
+        };
+
+        const updatedQueue = [...currentQueue, buzzPayload];
+        const firstInQueue = updatedQueue[0];
+
+        transaction.update(sessionRef, {
+          buzzedTeam: firstInQueue,
+          buzzerQueue: updatedQueue,
+          status: 'question_buzzed',
+          lastAction: 'buzz',
+          lastActionTimestamp: Date.now(),
+          updatedAt: new Date().toISOString(),
+        });
       });
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, path);
+      console.warn('Student buzz transaction note:', err);
     }
   };
 
@@ -730,17 +826,7 @@ export default function App() {
                 teams={teams}
                 onStartBoard={() => setIsWaitingRoomActive(false)}
                 onAddTeam={handleAddTeamOnTheFly}
-                onRemoveTeam={(teamId) => {
-                  const updated = { ...teams };
-                  delete updated[teamId];
-                  setTeams(updated);
-                  if (activeSession?.id) {
-                    updateDoc(doc(db, 'game_sessions', activeSession.id), {
-                      teams: updated,
-                      updatedAt: new Date().toISOString(),
-                    }).catch(() => {});
-                  }
-                }}
+                onRemoveTeam={handleKickTeam}
               />
             ) : (
               <BoardView
@@ -752,6 +838,7 @@ export default function App() {
                 onStartTieBreaker={() => setShowTieBreaker(true)}
                 onOpenSoundSettings={() => setShowSoundSettings(true)}
                 onBackToMain={handleResetToLobby}
+                onKickTeam={handleKickTeam}
                 sessionPin={activeSession?.pin}
                 onAdjustTeamScore={handleAdjustTeamScore}
                 onAddTeam={handleAddTeamOnTheFly}
@@ -822,6 +909,7 @@ export default function App() {
           onResetTimer={handleResetTimer}
           onReopenBuzzer={handleReopenBuzzer}
           penaltyForWrong={penaltyForWrong}
+          onKickTeam={handleKickTeam}
         />
       )}
 

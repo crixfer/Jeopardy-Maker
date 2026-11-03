@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, RotateCcw, Plus, Eye, Lightbulb, CheckCircle2, XCircle, Bell, Sparkles, Radio, Users, Check, X } from 'lucide-react';
+import { Play, Pause, RotateCcw, Plus, Eye, Lightbulb, CheckCircle2, XCircle, Bell, Sparkles, Radio, Users, Check, X, UserX } from 'lucide-react';
 import { ActiveQuestionState, Team, BuzzerQueueItem } from '../types/game';
 import { Avatar } from './Avatar';
 import { soundManager } from '../utils/soundEffects';
@@ -20,6 +20,7 @@ interface QuestionModalProps {
   penaltyForWrong: boolean;
   onToggleAnswerReveal?: (revealed: boolean) => void;
   onTimerTickDown?: () => void;
+  onKickTeam?: (teamId: string) => void;
 }
 
 export const QuestionModal: React.FC<QuestionModalProps> = ({
@@ -36,6 +37,7 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({
   onReopenBuzzer,
   penaltyForWrong,
   onToggleAnswerReveal,
+  onKickTeam,
 }) => {
   const [showHint, setShowHint] = useState<boolean>(false);
   const [isAnswerRevealed, setIsAnswerRevealed] = useState<boolean>(questionState.revealedAnswer || false);
@@ -302,7 +304,7 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({
                     )}
                   </div>
 
-                  {/* Direct Grade Buttons for the Selected / First Team */}
+                  {/* Direct Grade & Teacher Moderation Buttons */}
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleCorrect(selectedTeamId)}
@@ -318,6 +320,22 @@ export const QuestionModal: React.FC<QuestionModalProps> = ({
                       <X className="w-4 h-4" />
                       <span>Wrong {penaltyForWrong ? `(-${questionState.points})` : '(0)'}</span>
                     </button>
+                    {onKickTeam && selectedTeamId && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const targetTeamName = teams[selectedTeamId]?.name || activeResponder.teamName;
+                          if (window.confirm(`Kick ${targetTeamName} from the game? Their team will be removed and their buzzer remote disconnected.`)) {
+                            onKickTeam(selectedTeamId);
+                          }
+                        }}
+                        title={`Remove / Kick ${teams[selectedTeamId]?.name || activeResponder.teamName} from game`}
+                        className="inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-800 hover:bg-rose-900/80 text-rose-300 hover:text-white border border-rose-500/40 text-xs font-bold transition-all active:scale-95 cursor-pointer"
+                      >
+                        <UserX className="w-3.5 h-3.5 text-rose-400" />
+                        <span>Kick Team</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

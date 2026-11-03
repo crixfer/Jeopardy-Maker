@@ -27,6 +27,7 @@ export const BuzzerRemote: React.FC<BuzzerRemoteProps> = ({
   const [joinError, setJoinError] = useState<string>('');
   const [myTeamId, setMyTeamId] = useState<string | null>(propTeamId || null);
   const [isQuestionHidden, setIsQuestionHidden] = useState<boolean>(false);
+  const [isBuzzing, setIsBuzzing] = useState<boolean>(false);
 
   // When a new question is opened by the teacher, show the question to the student by default
   useEffect(() => {
@@ -138,6 +139,7 @@ export const BuzzerRemote: React.FC<BuzzerRemoteProps> = ({
         // Persist join so same student does not join repeatedly
         try {
           localStorage.setItem(`edujeopardy_student_team_${cleanPin}`, res.teamId);
+          localStorage.setItem('edujeopardy_student_active_pin', cleanPin);
         } catch {}
       } else {
         setJoinError(res.error || 'Game session not found. Please check the PIN.');
@@ -153,6 +155,7 @@ export const BuzzerRemote: React.FC<BuzzerRemoteProps> = ({
     if (currentSession?.pin) {
       try {
         localStorage.removeItem(`edujeopardy_student_team_${currentSession.pin}`);
+        localStorage.removeItem('edujeopardy_student_active_pin');
       } catch {}
     }
     setMyTeamId(null);
@@ -160,7 +163,10 @@ export const BuzzerRemote: React.FC<BuzzerRemoteProps> = ({
   };
 
   const handleBuzzerClick = async () => {
-    if (!currentSession || !myTeamId) return;
+    if (!currentSession || !myTeamId || isBuzzing) return;
+
+    // Disallow if team was removed/kicked by teacher
+    if (currentSession.kickedTeamIds?.includes(myTeamId)) return;
 
     // Check if team already attempted this question and missed
     if (currentSession.attemptedTeamIds?.includes(myTeamId)) {
@@ -171,6 +177,7 @@ export const BuzzerRemote: React.FC<BuzzerRemoteProps> = ({
     const inQueue = currentSession.buzzerQueue?.some((item) => item.teamId === myTeamId);
     if (inQueue) return;
 
+    setIsBuzzing(true);
     soundManager.playBuzzer();
 
     // Haptic vibration feedback on phones
@@ -184,8 +191,64 @@ export const BuzzerRemote: React.FC<BuzzerRemoteProps> = ({
       await onBuzzIn(currentSession.id, myTeamId);
     } catch (err) {
       console.error('Buzzer error:', err);
+    } finally {
+      setTimeout(() => {
+        setIsBuzzing(false);
+      }, 500);
     }
   };
+
+  // If student was explicitly kicked by instructor
+  const isKicked = Boolean(myTeamId && currentSession?.kickedTeamIds?.includes(myTeamId));
+  if (isKicked) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-slate-900 border-2 border-rose-600/70 rounded-3xl p-6 sm:p-8 shadow-2xl text-center space-y-4 animate-fadeIn">
+          <div className="w-16 h-16 rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-400 flex items-center justify-center mx-auto shadow-lg shadow-rose-500/20">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <div className="space-y-1.5">
+            <h2 className="text-xl sm:text-2xl font-black text-white">Removed from Game</h2>
+            <p className="text-xs sm:text-sm text-slate-300">
+              Your team was removed from this classroom session by the teacher.
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              if (currentSession?.pin) {
+                try {
+                  localStorage.removeItem(`edujeopardy_student_team_${currentSession.pin}`);
+                  localStorage.removeItem('edujeopardy_student_active_pin');
+                } catch {}
+              }
+              setMyTeamId(null);
+              onLeaveSession();
+            }}
+            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-slate-800 to-slate-700 hover:from-slate-700 hover:to-slate-600 text-white font-extrabold text-sm transition-all shadow-md active:scale-95 cursor-pointer"
+          >
+            Return to Join Screen
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // If student was already joined on this device, but session is currently reconnecting
+  if (myTeamId && !currentSession) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="w-full max-w-sm bg-slate-900 border-2 border-indigo-700/60 rounded-3xl p-6 sm:p-8 shadow-2xl text-center space-y-4 animate-fadeIn">
+          <div className="w-12 h-12 border-3 border-amber-400 border-t-transparent rounded-full animate-spin mx-auto" />
+          <div className="space-y-1">
+            <h3 className="text-base font-black text-white">Connecting to Room...</h3>
+            <p className="text-xs text-slate-400">
+              Syncing your buzzer with room PIN <strong className="text-amber-400 font-mono">{pinInput || 'session'}</strong>.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // If not joined to any session, show the Join form
   if (!currentSession || !myTeamId || !currentSession.teams?.[myTeamId]) {
@@ -453,19 +516,21 @@ export const BuzzerRemote: React.FC<BuzzerRemoteProps> = ({
                   </div>
                   <button
                     onClick={handleBuzzerClick}
-                    className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-indigo-600/30 transition-all"
+                    disabled={isBuzzing}
+                    className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-95 disabled:opacity-80 text-white font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-indigo-600/30 transition-all"
                   >
-                    <Radio className="w-4 h-4" />
-                    <span>Queue Buzz (Steal Opportunity)</span>
+                    <Radio className={`w-4 h-4 ${isBuzzing ? 'animate-spin' : ''}`} />
+                    <span>{isBuzzing ? 'Locking in Queue...' : 'Queue Buzz (Steal Opportunity)'}</span>
                   </button>
                 </div>
               ) : (
                 <button
                   onClick={handleBuzzerClick}
-                  className="w-full py-3.5 sm:py-4 rounded-2xl bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 hover:from-rose-500 hover:to-red-500 active:scale-95 text-white font-black text-lg sm:text-xl tracking-wider shadow-xl shadow-red-600/40 border-2 border-red-400/50 flex items-center justify-center gap-2.5 cursor-pointer transition-all"
+                  disabled={isBuzzing}
+                  className="w-full py-3.5 sm:py-4 rounded-2xl bg-gradient-to-r from-rose-600 via-red-600 to-rose-700 hover:from-rose-500 hover:to-red-500 active:scale-95 disabled:scale-95 text-white font-black text-lg sm:text-xl tracking-wider shadow-xl shadow-red-600/40 border-2 border-red-400/50 flex items-center justify-center gap-2.5 cursor-pointer transition-all"
                 >
-                  <Radio className="w-6 h-6 animate-pulse" />
-                  <span>BUZZ IN NOW!</span>
+                  <Radio className={`w-6 h-6 ${isBuzzing ? 'animate-spin text-amber-300' : 'animate-pulse'}`} />
+                  <span>{isBuzzing ? 'BUZZING IN...' : 'BUZZ IN NOW!'}</span>
                 </button>
               )}
             </div>
@@ -583,15 +648,16 @@ export const BuzzerRemote: React.FC<BuzzerRemoteProps> = ({
                   </span>
                   <button
                     onClick={handleBuzzerClick}
-                    className="w-48 h-48 sm:w-52 sm:h-52 rounded-full bg-gradient-to-b from-indigo-600 via-indigo-700 to-indigo-900 hover:from-indigo-500 hover:to-indigo-800 p-3 shadow-xl border-4 border-indigo-400/40 hover:scale-105 active:scale-95 transition-all flex items-center justify-center cursor-pointer group"
+                    disabled={isBuzzing}
+                    className="w-48 h-48 sm:w-52 sm:h-52 rounded-full bg-gradient-to-b from-indigo-600 via-indigo-700 to-indigo-900 hover:from-indigo-500 hover:to-indigo-800 p-3 shadow-xl border-4 border-indigo-400/40 hover:scale-105 active:scale-95 disabled:opacity-80 transition-all flex items-center justify-center cursor-pointer group"
                   >
                     <div className="w-full h-full rounded-full bg-slate-950 flex flex-col items-center justify-center p-3">
-                      <Radio className="w-9 h-9 text-indigo-400 group-hover:scale-110 transition-transform mb-1" />
+                      <Radio className={`w-9 h-9 text-indigo-400 mb-1 ${isBuzzing ? 'animate-spin' : 'group-hover:scale-110'}`} />
                       <span className="text-xl sm:text-2xl font-black text-white">
-                        QUEUE BUZZ
+                        {isBuzzing ? 'LOCKING...' : 'QUEUE BUZZ'}
                       </span>
                       <span className="text-[10px] font-bold text-indigo-300 uppercase mt-1">
-                        Tap to be next in line
+                        {isBuzzing ? 'Registering buzz' : 'Tap to be next in line'}
                       </span>
                     </div>
                   </button>
@@ -608,15 +674,16 @@ export const BuzzerRemote: React.FC<BuzzerRemoteProps> = ({
 
                 <button
                   onClick={handleBuzzerClick}
-                  className="w-56 h-56 sm:w-64 sm:h-64 rounded-full bg-gradient-to-b from-rose-500 via-red-600 to-rose-700 active:from-red-700 active:to-red-800 p-3.5 sm:p-4 shadow-2xl shadow-red-500/60 border-4 border-red-300/50 hover:scale-105 active:scale-95 transition-all flex items-center justify-center cursor-pointer group"
+                  disabled={isBuzzing}
+                  className="w-56 h-56 sm:w-64 sm:h-64 rounded-full bg-gradient-to-b from-rose-500 via-red-600 to-rose-700 active:from-red-700 active:to-red-800 p-3.5 sm:p-4 shadow-2xl shadow-red-500/60 border-4 border-red-300/50 hover:scale-105 active:scale-95 disabled:scale-95 transition-all flex items-center justify-center cursor-pointer group"
                 >
                   <div className="w-full h-full rounded-full bg-gradient-to-br from-red-600 via-rose-600 to-red-800 border-4 border-red-400/80 flex flex-col items-center justify-center shadow-inner">
-                    <Radio className="w-12 h-12 text-white group-hover:scale-110 transition-transform mb-1.5 animate-pulse" />
+                    <Radio className={`w-12 h-12 text-white mb-1.5 ${isBuzzing ? 'animate-spin text-amber-300' : 'animate-pulse'}`} />
                     <span className="text-3xl sm:text-4xl font-black text-white tracking-widest drop-shadow-lg">
-                      BUZZ!
+                      {isBuzzing ? 'BUZZING!' : 'BUZZ!'}
                     </span>
                     <span className="text-[10px] sm:text-[11px] font-black text-amber-200 uppercase tracking-widest mt-1">
-                      TAP TO ANSWER
+                      {isBuzzing ? 'LOCKING IN TURN...' : 'TAP TO ANSWER'}
                     </span>
                   </div>
                 </button>

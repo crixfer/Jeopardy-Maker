@@ -1,11 +1,10 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Maximize2, Minimize2, Share2, Copy, Check, Users, Trophy, Settings, Plus, Sparkles, RefreshCw, QrCode, Zap, Sliders, Music, Dices, Home } from 'lucide-react';
+import { Maximize2, Minimize2, Share2, Copy, Check, Users, Trophy, Settings, Plus, Sparkles, RefreshCw, QrCode, Zap, Sliders, Music, Dices, Home, UserX } from 'lucide-react';
 import { Game, Category, Question, Team } from '../types/game';
 import { Avatar } from './Avatar';
 import { soundManager } from '../utils/soundEffects';
 import { JoinQRCode } from './JoinQRCode';
 import { StreakName, StreakBadge, StreakAvatarAura } from './StreakFireEffect';
-
 
 interface BoardViewProps {
   game: Game;
@@ -23,6 +22,7 @@ interface BoardViewProps {
   defaultTimerSeconds: number;
   setDefaultTimerSeconds: (sec: number) => void;
   onBackToMain?: () => void;
+  onKickTeam?: (teamId: string) => void;
 }
 
 export const BoardView: React.FC<BoardViewProps> = ({
@@ -41,11 +41,13 @@ export const BoardView: React.FC<BoardViewProps> = ({
   defaultTimerSeconds,
   setDefaultTimerSeconds,
   onBackToMain,
+  onKickTeam,
 }) => {
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [showShareModal, setShowShareModal] = useState<boolean>(false);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [teamToKick, setTeamToKick] = useState<Team | null>(null);
 
   // Mystery Roulette Random Question Picker State
   const [isRouletteActive, setIsRouletteActive] = useState<boolean>(false);
@@ -115,6 +117,32 @@ export const BoardView: React.FC<BoardViewProps> = ({
 
     return list;
   }, [categories, answeredQuestionIds]);
+
+  // Auto-finish game when there are no ties or questions to answer
+  const autoFinishTriggeredRef = useRef<boolean>(false);
+  useEffect(() => {
+    const totalQuestions = categories.reduce((sum, cat) => sum + (cat.questions?.length || 0), 0);
+    if (totalQuestions > 0 && unansweredQuestions.length === 0 && !isRouletteActive) {
+      if (!autoFinishTriggeredRef.current) {
+        autoFinishTriggeredRef.current = true;
+        const sorted = Object.values(teams).sort((a, b) => b.score - a.score);
+        const isTieForFirst = sorted.length > 1 && sorted[0].score === sorted[1].score;
+        if (!isTieForFirst) {
+          const timer = setTimeout(() => {
+            onEndGame();
+          }, 600);
+          return () => clearTimeout(timer);
+        } else if (onStartTieBreaker) {
+          const timer = setTimeout(() => {
+            onStartTieBreaker();
+          }, 600);
+          return () => clearTimeout(timer);
+        }
+      }
+    } else {
+      autoFinishTriggeredRef.current = false;
+    }
+  }, [unansweredQuestions.length, categories, isRouletteActive, teams, onEndGame, onStartTieBreaker]);
 
   // Mystery Question Roulette with thrilling fast-to-slow deceleration
   const handleStartRoulette = () => {
@@ -561,6 +589,21 @@ export const BoardView: React.FC<BoardViewProps> = ({
                   {team.score} PTS
                 </div>
 
+                {/* Teacher Action: Kick/Remove Team Button */}
+                {onKickTeam && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTeamToKick(team);
+                    }}
+                    title={`Remove / Kick ${team.name} from game`}
+                    className="absolute top-1.5 right-1.5 p-1 rounded-lg bg-slate-800/80 hover:bg-rose-600/90 text-slate-400 hover:text-white transition-all opacity-0 group-hover:opacity-100 sm:opacity-70 cursor-pointer shadow"
+                  >
+                    <UserX className="w-3.5 h-3.5" />
+                  </button>
+                )}
+
                 {/* Quick score buttons for instructor convenience */}
                 <div className="mt-2 flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
                   <button
@@ -584,6 +627,44 @@ export const BoardView: React.FC<BoardViewProps> = ({
         </div>
 
       </div>
+
+      {/* Teacher Kick Team Confirmation Modal */}
+      {teamToKick && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-sm bg-slate-900 border-2 border-rose-600/70 rounded-2xl p-5 shadow-2xl space-y-4 text-center">
+            <div className="w-12 h-12 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-400 flex items-center justify-center mx-auto">
+              <UserX className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-lg font-black text-white">Kick Team from Game?</h3>
+              <p className="text-xs text-slate-300">
+                Are you sure you want to remove <strong className="text-rose-400 font-black">{teamToKick.name}</strong>? Their score will be deleted and their buzzer remote will be disconnected.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setTeamToKick(null)}
+                className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onKickTeam && teamToKick) {
+                    onKickTeam(teamToKick.id);
+                  }
+                  setTeamToKick(null);
+                }}
+                className="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs transition-colors shadow-md shadow-rose-600/30 cursor-pointer"
+              >
+                Yes, Kick Team
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Scannable Phone QR Code Modal */}
       {showShareModal && sessionPin && (

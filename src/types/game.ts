@@ -80,6 +80,7 @@ export interface GameSession {
   buzzedTeam?: BuzzerQueueItem | null;
   buzzerQueue?: BuzzerQueueItem[];
   attemptedTeamIds?: string[]; // Teams that have already attempted this question
+  kickedTeamIds?: string[]; // Teams that have been removed/kicked by the instructor
   answeredQuestionIds: string[];
   tieBreakerQuestions?: TieBreakerQuestion[];
   lastAction?: string; // For sound triggers in clients: 'buzz', 'correct', 'wrong', 'timeup'
